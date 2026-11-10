@@ -50,3 +50,15 @@ mybooktally_add_test(tst_list_repository mybooktally_core)
 mybooktally_add_test(tst_json_exchange mybooktally_core)
 mybooktally_add_test(tst_book_table_model mybooktally_core)
 mybooktally_add_test(tst_gui mybooktally_gui)
+
+# Linux only: checks that installing produces a menu entry and icons, which
+# are the only way a Linux app shows its icon. Not a Qt Test program, so it
+# is added directly rather than with mybooktally_add_test().
+if(UNIX AND NOT APPLE)
+	add_test(NAME check_linux_install
+		COMMAND "${CMAKE_COMMAND}"
+			-DBUILD_DIR=${PROJECT_BINARY_DIR}
+			-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/install-check
+			-P "${CMAKE_CURRENT_SOURCE_DIR}/check_linux_install.cmake")
+	set_tests_properties(check_linux_install PROPERTIES TIMEOUT 120)
+endif()

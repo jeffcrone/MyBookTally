@@ -80,8 +80,28 @@ elseif(UNIX AND NOT APPLE)
 	# Linux desktop integration: a menu entry, and the icon at each size the
 	# freedesktop icon theme looks for. Qt itself comes from the system's
 	# packages on Linux, so nothing else is copied.
-	install(FILES "${PROJECT_SOURCE_DIR}/packaging/linux/mybooktally.desktop"
-		DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+	#
+	# This is the only way the app gets an icon on Linux. An ELF executable
+	# has nowhere to store one (unlike a Windows .exe with its .rc file), so
+	# file managers always show the program file itself with a generic icon.
+	# Menus and taskbars find the icon through mybooktally.desktop's
+	# Icon=mybooktally line. On Wayland the window's own icon is ignored too:
+	# the compositor matches the app id the program reports ("mybooktally",
+	# from setDesktopFileName in main.cpp) to the installed .desktop file.
+	#
+	# The .desktop file is written at install time rather than configure
+	# time so its Exec= line holds the full path of the installed program
+	# under whatever --prefix was given. A bare "MyBookTally" would depend on
+	# the install folder being on the desktop session's PATH, which for
+	# ~/.local/bin is often not the case until the next login.
+	install(CODE "
+		get_filename_component(mybooktally_prefix \"\${CMAKE_INSTALL_PREFIX}\" ABSOLUTE)
+		set(MYBOOKTALLY_EXEC \"\${mybooktally_prefix}/${CMAKE_INSTALL_BINDIR}/MyBookTally\")
+		set(mybooktally_desktop \"\$ENV{DESTDIR}\${mybooktally_prefix}/${CMAKE_INSTALL_DATADIR}/applications/mybooktally.desktop\")
+		message(STATUS \"Installing: \${mybooktally_desktop}\")
+		configure_file(\"${PROJECT_SOURCE_DIR}/packaging/linux/mybooktally.desktop.in\"
+			\"\${mybooktally_desktop}\" @ONLY)
+	")
 	foreach(size 16 24 32 48 64 128 256 512)
 		install(FILES "${icon_dir}/MyBookTally_Icon_${size}x${size}.png"
 			DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/${size}x${size}/apps

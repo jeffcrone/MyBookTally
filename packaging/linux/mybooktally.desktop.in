@@ -1,10 +1,14 @@
+# Template for the Linux menu entry. CMake fills in the Exec= line with
+# the installed program's full path when "cmake --install" runs; see
+# src/app/CMakeLists.txt.
 [Desktop Entry]
 Type=Application
 Name=MyBookTally
 GenericName=Book Collection Manager
 Comment=Keep track of the books in your personal collection
-Exec=MyBookTally
+Exec="@MYBOOKTALLY_EXEC@"
 Icon=mybooktally
 Terminal=false
 Categories=Office;Database;Qt;
 Keywords=books;library;collection;catalog;reading;
+StartupWMClass=MyBookTally

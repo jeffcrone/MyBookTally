@@ -148,13 +148,17 @@ These steps are for Ubuntu 24.04 or Debian 12 and newer. Other distributions hav
    ./build/linux-release/src/app/MyBookTally
    ```
 
-5. **Optional: install it** for your own user, with a menu entry and icon:
+5. **Install it** for your own user, so it gets its icon and a menu entry:
 
    ```sh
    cmake --install build/linux-release --prefix ~/.local
    ```
 
-   This copies the program to `~/.local/bin`, the menu entry to `~/.local/share/applications`, and the icons to `~/.local/share/icons/hicolor`. Without `--prefix`, the files go to `dist/linux-release` inside the project folder.
+   This copies the program to `~/.local/bin`, the menu entry to `~/.local/share/applications/mybooktally.desktop`, and the icons to `~/.local/share/icons/hicolor`. The menu entry points at the installed program by its full path. Without `--prefix`, the files go to `dist/linux-release` inside the project folder, where the desktop does not look for them.
+
+   **Why the program file itself has no icon on Linux:** unlike a Windows `.exe`, a Linux program file has nowhere to store an icon, so file managers always show `MyBookTally` with a generic program icon. Linux desktops take an app's icon from its installed menu entry instead. On Wayland desktops (such as GNOME, KDE Plasma, and COSMIC), the same applies to the window and taskbar icon: the desktop matches the running app to `mybooktally.desktop`. So until the app is installed, it shows a generic icon there too, even when run from the build folder. After installing, launch it from the app menu. If the icon does not appear right away, log out and back in so the desktop rereads its menu entries.
+
+   To remove it again, delete the files the install step listed. CMake also records them in `build/linux-release/install_manifest.txt`.
 
 If CMake cannot find Qt (for example, because you installed Qt with the Qt online installer rather than from your distribution), tell it where Qt is:
 
@@ -224,7 +228,7 @@ If you build from inside **Qt Creator** or **Visual Studio** (see [Using an IDE]
 
 ## Running the automated tests
 
-The tests are written with Qt Test and run by CTest. There are 9 test programs, which together check every database query, the import and export code, ISBN checking, the table model, and the main window and dialogs:
+The tests are written with Qt Test and run by CTest. There are 9 test programs, which together check every database query, the import and export code, ISBN checking, the table model, and the main window and dialogs. On Linux there is also a 10th test, which checks what installing produces:
 
 | Test | What it covers |
 | --- | --- |
@@ -237,6 +241,7 @@ The tests are written with Qt Test and run by CTest. There are 9 test programs, 
 | `tst_json_exchange` | Export with and without IDs, import into an empty library, re-importing without duplicates, matching books by ISBN or by title and authors, bad files |
 | `tst_book_table_model` | What each column shows, and that numbers sort as numbers |
 | `tst_gui` | The main window (columns, search, lists, private books), the book editor, the details dialog, and the manage dialog, driven as a user would |
+| `check_linux_install` | Linux only. Installs the build into a scratch folder and checks the menu entry (full program path, icon name, and `desktop-file-validate` if that tool is installed) and the icons at every size. Needs a completed build. |
 
 The tests never touch your real library: each one uses its own throwaway in-memory database and a throwaway settings file. The window tests use Qt's "offscreen" display, so no windows appear and no screen is needed.
 
@@ -1010,7 +1015,7 @@ src/core/                Everything that touches the database (no windows)
   BookTableModel           The data behind the main book table
   Isbn                     ISBN clean-up and checking
 src/app/                 The windows and dialogs, and main.cpp
-packaging/linux/         Linux desktop menu entry
+packaging/linux/         Linux desktop menu entry template (filled in at install time)
 tests/                   The automated tests (Qt Test)
 .github/workflows/       GitHub Actions: tests.yml and release.yml
 ```
