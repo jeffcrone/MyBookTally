@@ -38,7 +38,7 @@ struct ImportResult
 //   {
 //     "format": "MyBookTally",
 //     "formatVersion": 1,
-//     "appVersion": "0.0.1",
+//     "appVersion": "0.0.2",
 //     "exportedAt": "2026-11-10T14:00:00.000Z",
 //     "includesIds": true,
 //     "books": [ { ...one object per book... } ]

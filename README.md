@@ -298,7 +298,7 @@ The version number is written in exactly one place: the `project()` call at the 
 
 ```cmake
 project(MyBookTally
-	VERSION 0.0.1
+	VERSION 0.0.2
 	...
 ```
 
@@ -943,7 +943,7 @@ Import and export ([JsonExchange.cpp](src/core/JsonExchange.cpp)) have no SQL of
 {
 	"format": "MyBookTally",
 	"formatVersion": 1,
-	"appVersion": "0.0.1",
+	"appVersion": "0.0.2",
 	"exportedAt": "2026-11-10T14:00:00.000Z",
 	"includesIds": true,
 	"books": [
