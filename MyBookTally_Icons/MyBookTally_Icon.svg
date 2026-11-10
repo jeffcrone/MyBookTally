@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	MyBookTally application icon - the scalable master.
+	Every PNG and the Windows .ico in this folder are rendered from this file,
+	so change the artwork here and regenerate the others rather than editing
+	them by hand.
+
+	Drawn on a 256x256 grid. The shapes are deliberately bold and few: the icon
+	has to stay recognizable as a book at 16x16, where fine detail turns to mush.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+	<title>MyBookTally</title>
+	<defs>
+		<!-- Background: a deep blue, slightly lighter at the top for a little depth. -->
+		<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+			<stop offset="0" stop-color="#2F6497"/>
+			<stop offset="1" stop-color="#1B3A5C"/>
+		</linearGradient>
+		<!-- Cover: warm red so the book stands out clearly against the blue. -->
+		<linearGradient id="cover" x1="0" y1="0" x2="1" y2="1">
+			<stop offset="0" stop-color="#D9534A"/>
+			<stop offset="1" stop-color="#B53A32"/>
+		</linearGradient>
+	</defs>
+
+	<!-- Rounded-square tile, inset a little so the corners are not clipped. -->
+	<rect x="12" y="12" width="232" height="232" rx="48" fill="url(#bg)"/>
+
+	<!-- Soft drop shadow behind the book, so it sits on the tile rather than floating. -->
+	<rect x="72" y="44" width="128" height="184" rx="12" fill="#000" opacity="0.25"/>
+
+	<!-- Bookmark ribbon, drawn before the book so the cover hides its top and
+	     only the notched tail shows, hanging out from behind the bottom edge. -->
+	<path d="M150 196 H168 V234 L159 226 L150 234 Z" fill="#F2C14E"/>
+
+	<!-- Front cover. The icon shows only the front of the book, so no page
+	     edges are drawn. -->
+	<rect x="64" y="36" width="128" height="184" rx="12" fill="url(#cover)"/>
+
+	<!-- Spine: a darker band on the left edge. The second rect squares off the
+	     band's right side so only the outer corners are rounded. -->
+	<rect x="64" y="36" width="24" height="184" rx="12" fill="#8E2A24"/>
+	<rect x="76" y="36" width="12" height="184" fill="#8E2A24"/>
+
+	<!-- Title plate on the cover, with two "lines of text". -->
+	<rect x="104" y="68" width="68" height="44" rx="5" fill="#F7EEDC"/>
+	<g stroke="#B53A32" stroke-width="5" stroke-linecap="round">
+		<line x1="116" y1="83" x2="160" y2="83"/>
+		<line x1="122" y1="97" x2="154" y2="97"/>
+	</g>
+</svg>

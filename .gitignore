@@ -1,0 +1,7 @@
+# Ignore Claude files
+CLAUDE.md
+CLAUDE.local.md
+.claude/
+.mcp.json
+.worktreeinclude
+.claude-plugin/
