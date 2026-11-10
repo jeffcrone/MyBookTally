@@ -50,6 +50,7 @@ mybooktally_add_test(tst_list_repository mybooktally_core)
 mybooktally_add_test(tst_json_exchange mybooktally_core)
 mybooktally_add_test(tst_book_table_model mybooktally_core)
 mybooktally_add_test(tst_gui mybooktally_gui)
+mybooktally_add_test(tst_column_fitter mybooktally_gui)
 
 # Linux only: checks that installing produces a menu entry and icons, which
 # are the only way a Linux app shows its icon. Not a Qt Test program, so it

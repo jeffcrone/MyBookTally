@@ -27,6 +27,8 @@ MyBookTally is a simple, easy-to-use desktop application that helps you keep tra
 
 - **Book list.** Every book in your library in one table. Click a column heading to sort by it, and type in the search box to filter by title, author, series, genre, or any other field.
 - **Choose your columns.** Show any of the book's fields, plus the names of its authors, series, and genres, its average rating, and so on. Use **View › Columns**, or right-click a column heading. Title and Authors are shown by default. Your choice is remembered.
+- **Columns that fit the window.** The columns shown always share the table's full width, growing and shrinking as you resize the window. Long fields such as Title get more room than short ones such as Pages. No column gets narrower than its minimum width; if the window is too narrow for all of them, the table scrolls sideways instead. Drag a column's edge to change its share, and the other columns adjust to fill the rest. Your proportions are remembered.
+- **Window size.** The first time it runs, the window opens 1280×780 pixels (or 90% of the screen, on a smaller screen). After that it opens at whatever size you last left it.
 - **Book details.** Double-click a book (or press Enter) to see every field, the names of everything it links to, its cover, its reviews and ratings, and the lists it is in.
 - **Add, edit, and delete books.** A book records:
   - its title
@@ -228,7 +230,7 @@ If you build from inside **Qt Creator** or **Visual Studio** (see [Using an IDE]
 
 ## Running the automated tests
 
-The tests are written with Qt Test and run by CTest. There are 9 test programs, which together check every database query, the import and export code, ISBN checking, the table model, and the main window and dialogs. On Linux there is also a 10th test, which checks what installing produces:
+The tests are written with Qt Test and run by CTest. There are 10 test programs, which together check every database query, the import and export code, ISBN checking, the table model, column fitting, and the main window and dialogs. On Linux there is also an 11th test, which checks what installing produces:
 
 | Test | What it covers |
 | --- | --- |
@@ -240,7 +242,8 @@ The tests are written with Qt Test and run by CTest. There are 9 test programs, 
 | `tst_list_repository` | Lists, and adding books to and removing books from them |
 | `tst_json_exchange` | Export with and without IDs, import into an empty library, re-importing without duplicates, matching books by ISBN or by title and authors, bad files |
 | `tst_book_table_model` | What each column shows, and that numbers sort as numbers |
-| `tst_gui` | The main window (columns, search, lists, private books), the book editor, the details dialog, and the manage dialog, driven as a user would |
+| `tst_gui` | The main window (first-run size, columns, search, lists, private books), the book editor, the details dialog, and the manage dialog, driven as a user would |
+| `tst_column_fitter` | Sharing the table's width among its columns: proportions, minimum widths, resizing the window, showing and hiding columns, and dragging a column edge |
 | `check_linux_install` | Linux only. Installs the build into a scratch folder and checks the menu entry (full program path, icon name, and `desktop-file-validate` if that tool is installed) and the icons at every size. Needs a completed build. |
 
 The tests never touch your real library: each one uses its own throwaway in-memory database and a throwaway settings file. The window tests use Qt's "offscreen" display, so no windows appear and no screen is needed.

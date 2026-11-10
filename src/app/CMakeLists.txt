@@ -5,6 +5,8 @@ add_library(mybooktally_gui STATIC
 	BookDetailsDialog.h
 	BookEditorDialog.cpp
 	BookEditorDialog.h
+	ColumnFitter.cpp
+	ColumnFitter.h
 	CoverImage.cpp
 	CoverImage.h
 	LinkListEditor.cpp

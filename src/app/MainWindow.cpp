@@ -4,6 +4,7 @@
 #include "BookEditorDialog.h"
 #include "BookRepository.h"
 #include "BookTableModel.h"
+#include "ColumnFitter.h"
 #include "Database.h"
 #include "DatabaseError.h"
 #include "JsonExchange.h"
@@ -32,6 +33,7 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QSaveFile>
+#include <QScreen>
 #include <QSettings>
 #include <QSortFilterProxyModel>
 #include <QSplitter>
@@ -49,14 +51,85 @@ constexpr int ListIdRole = Qt::UserRole;
 
 // Settings keys. Bump the header key's suffix if the set of columns ever
 // changes, so an old saved layout is not applied to the wrong columns.
-const char* const geometryKey = "mainWindow/geometry";
+//
+// The geometry key is ".v2" because version 0.0.1 had no default window
+// size and saved whatever small size Qt picked; a new key means that saved
+// size is ignored once and the window opens at the new default instead.
+const char* const geometryKey = "mainWindow/geometry.v2";
+const char* const oldGeometryKey = "mainWindow/geometry";
 const char* const stateKey = "mainWindow/state";
 const char* const splitterKey = "mainWindow/splitter";
 const char* const headerKey = "bookTable/header.v1";
+const char* const columnWeightsKey = "bookTable/columnWeights.v1";
 const char* const showPrivateKey = "bookTable/showPrivate";
 const char* const lastFolderKey = "files/lastFolder";
 
+// How the book table's width is shared among its columns (see ColumnFitter),
+// and the narrowest each column may get. Long free text gets the most room;
+// short values (pages, ISBN, a status name) the least. Indexed by BookColumn.
+const QList<double> defaultColumnWeights = {
+	3.0, // Title
+	2.0, // Authors
+	2.0, // Series
+	1.6, // Genres
+	1.0, // Released
+	1.3, // ISBN
+	0.7, // Pages
+	1.2, // Type
+	1.2, // Ownership
+	1.3, // Reading Status
+	1.6, // Location
+	1.0, // Rating
+	0.8, // Private
+	3.0, // Description
+};
+const QList<int> columnMinimumWidths = {
+	160, // Title: wide enough to tell books apart
+	120, // Authors
+	110, // Series
+	100, // Genres
+	80,  // Released
+	110, // ISBN: 13 digits
+	60,  // Pages
+	90,  // Type
+	90,  // Ownership
+	100, // Reading Status
+	100, // Location
+	90,  // Rating: "4.5/5 (12)"
+	60,  // Private
+	140, // Description
+};
+
+// The window size on first run, before the user has resized it. Without
+// this Qt sizes the window to its contents, which is cramped. It is capped
+// to most of the screen so it also fits on small laptop displays.
+const QSize preferredWindowSize(1280, 780);
+constexpr double maxScreenFraction = 0.9;
+
+QList<double> toDoubles(const QVariantList& values)
+{
+	QList<double> result;
+	for (const QVariant& value : values)
+		result.append(value.toDouble());
+	return result;
+}
+
+QVariantList toVariants(const QList<double>& values)
+{
+	QVariantList result;
+	for (double value : values)
+		result.append(value);
+	return result;
+}
+
 } // namespace
+
+QSize MainWindow::defaultWindowSize(const QRect& availableScreen)
+{
+	return QSize(
+		std::min(preferredWindowSize.width(), int(availableScreen.width() * maxScreenFraction)),
+		std::min(preferredWindowSize.height(), int(availableScreen.height() * maxScreenFraction)));
+}
 
 MainWindow::MainWindow(Database& database, QSettings& settings, QWidget* parent)
 	: QMainWindow(parent)
@@ -167,7 +240,6 @@ void MainWindow::buildLayout()
 	m_table->setWordWrap(false);
 	m_table->verticalHeader()->hide();
 	m_table->horizontalHeader()->setSectionsMovable(true);
-	m_table->horizontalHeader()->setStretchLastSection(true);
 	m_table->setContextMenuPolicy(Qt::CustomContextMenu);
 	m_table->horizontalHeader()->setContextMenuPolicy(Qt::CustomContextMenu);
 
@@ -282,7 +354,17 @@ void MainWindow::buildMenus()
 
 void MainWindow::restoreSettings()
 {
-	restoreGeometry(m_settings.value(QLatin1String(geometryKey)).toByteArray());
+	m_settings.remove(QLatin1String(oldGeometryKey));
+	if (!restoreGeometry(m_settings.value(QLatin1String(geometryKey)).toByteArray())) {
+		// First run: open at a comfortable size, centered on the screen.
+		// (Wayland does not let programs place their own windows, so there
+		// the desktop decides the position; the size still applies.)
+		if (const QScreen* screen = this->screen()) {
+			const QRect available = screen->availableGeometry();
+			resize(defaultWindowSize(available));
+			move(available.center() - rect().center());
+		}
+	}
 	restoreState(m_settings.value(QLatin1String(stateKey)).toByteArray());
 	if (auto* splitter = findChild<QSplitter*>(QStringLiteral("mainSplitter")))
 		splitter->restoreState(m_settings.value(QLatin1String(splitterKey)).toByteArray());
@@ -293,10 +375,17 @@ void MainWindow::restoreSettings()
 		// First run (or unreadable saved state): only the default columns.
 		for (int column = 0; column < int(BookColumn::Count); ++column)
 			header->setSectionHidden(column, !BookTableModel::isVisibleByDefault(BookColumn(column)));
-		header->resizeSection(int(BookColumn::Title), 320);
 	}
 	// The title column must always be visible (see buildActions()).
 	header->setSectionHidden(int(BookColumn::Title), false);
+
+	// Created after the header state is restored, because restoreState()
+	// also restores the header's resize modes, which would undo the fitter's.
+	m_columnFitter = new ColumnFitter(m_table, defaultColumnWeights, columnMinimumWidths, this);
+	m_columnFitter->setWeights(toDoubles(m_settings.value(QLatin1String(columnWeightsKey)).toList()));
+	connect(m_columnFitter, &ColumnFitter::weightsChanged, this, [this] {
+		m_settings.setValue(QLatin1String(columnWeightsKey), toVariants(m_columnFitter->weights()));
+	});
 
 	// Match the View > Columns check marks to what is now shown. Signals are
 	// blocked so this does not toggle the columns straight back.
@@ -317,6 +406,7 @@ void MainWindow::saveSettings()
 	if (auto* splitter = findChild<QSplitter*>(QStringLiteral("mainSplitter")))
 		m_settings.setValue(QLatin1String(splitterKey), splitter->saveState());
 	m_settings.setValue(QLatin1String(headerKey), m_table->horizontalHeader()->saveState());
+	m_settings.setValue(QLatin1String(columnWeightsKey), toVariants(m_columnFitter->weights()));
 	m_settings.setValue(QLatin1String(showPrivateKey), m_showPrivate->isChecked());
 }
 
@@ -329,6 +419,9 @@ void MainWindow::closeEvent(QCloseEvent* event)
 void MainWindow::setColumnVisible(int column, bool visible)
 {
 	m_table->horizontalHeader()->setSectionHidden(column, !visible);
+	// Share the width out again so the new set of columns fills the table.
+	if (m_columnFitter)
+		m_columnFitter->fit();
 	// Save straight away, not only on close, so the choice survives a crash.
 	m_settings.setValue(QLatin1String(headerKey), m_table->horizontalHeader()->saveState());
 }

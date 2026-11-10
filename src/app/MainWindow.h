@@ -2,6 +2,7 @@
 
 #include <QList>
 #include <QMainWindow>
+#include <QSize>
 #include <QString>
 
 class QAction;
@@ -9,6 +10,7 @@ class QLabel;
 class QLineEdit;
 class QListWidget;
 class QMenu;
+class QRect;
 class QSettings;
 class QSortFilterProxyModel;
 class QTableView;
@@ -16,6 +18,7 @@ class QTableView;
 namespace mbt {
 
 class BookTableModel;
+class ColumnFitter;
 class Database;
 
 // The main window: the user's lists on the left ("Library" for every book,
@@ -50,6 +53,11 @@ public:
 	QAction* showPrivateAction() const { return m_showPrivate; }
 	// The View > Columns action for each column, in column order.
 	const QList<QAction*>& columnActions() const { return m_columnActions; }
+	ColumnFitter* columnFitter() const { return m_columnFitter; }
+
+	// The size the window opens at on first run, for a screen whose usable
+	// area is availableScreen: 1280 x 780, or 90% of the screen if smaller.
+	static QSize defaultWindowSize(const QRect& availableScreen);
 
 protected:
 	void closeEvent(QCloseEvent* event) override;
@@ -93,6 +101,7 @@ private:
 	QLineEdit* m_search = nullptr;
 	QLabel* m_status = nullptr;
 	QMenu* m_addToListMenu = nullptr;
+	ColumnFitter* m_columnFitter = nullptr;
 
 	QAction* m_addBook = nullptr;
 	QAction* m_editBook = nullptr;

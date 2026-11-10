@@ -10,6 +10,7 @@
 #include "BookDetailsDialog.h"
 #include "BookEditorDialog.h"
 #include "BookTableModel.h"
+#include "ColumnFitter.h"
 #include "LinkListEditor.h"
 #include "ListRepository.h"
 #include "MainWindow.h"
@@ -28,6 +29,7 @@
 #include <QListWidget>
 #include <QPlainTextEdit>
 #include <QPushButton>
+#include <QScreen>
 #include <QSettings>
 #include <QSortFilterProxyModel>
 #include <QSpinBox>
@@ -99,6 +101,83 @@ private slots:
 		const auto settings = freshSettings();
 		MainWindow window(*database, *settings);
 		QVERIFY(!window.columnActions().at(int(BookColumn::Title))->isEnabled());
+	}
+
+	void defaultWindowSizeIsWideButFitsTheScreen()
+	{
+		// A large screen gets the full preferred size.
+		QCOMPARE(MainWindow::defaultWindowSize(QRect(0, 0, 2560, 1400)), QSize(1280, 780));
+		// A small one gets 90% of it, so the window never spills off screen.
+		QCOMPARE(MainWindow::defaultWindowSize(QRect(0, 0, 1000, 700)), QSize(900, 630));
+	}
+
+	void mainWindowOpensAtDefaultSizeOnFirstRun()
+	{
+		const auto database = test::freshDatabase();
+		const auto settings = freshSettings();
+		MainWindow window(*database, *settings);
+		const QRect available = window.screen()->availableGeometry();
+		QCOMPARE(window.size(), MainWindow::defaultWindowSize(available));
+	}
+
+	void mainWindowIgnoresSizeSavedByVersion001()
+	{
+		// 0.0.1 saved its small first-run size under the old key; that must
+		// not stop the window opening at the new default size.
+		const auto database = test::freshDatabase();
+		const auto settings = freshSettings();
+		{
+			MainWindow old(*database, *settings);
+			old.resize(400, 300);
+			settings->setValue("mainWindow/geometry", old.saveGeometry());
+		}
+		MainWindow window(*database, *settings);
+		QCOMPARE(window.size(), MainWindow::defaultWindowSize(window.screen()->availableGeometry()));
+		QVERIFY(!settings->contains("mainWindow/geometry"));
+	}
+
+	void mainWindowRemembersItsSize()
+	{
+		const auto database = test::freshDatabase();
+		const auto settings = freshSettings();
+		{
+			MainWindow window(*database, *settings);
+			window.resize(640, 480);
+			window.close();
+		}
+		MainWindow again(*database, *settings);
+		QCOMPARE(again.size(), QSize(640, 480));
+	}
+
+	void mainWindowColumnsFillTheTable()
+	{
+		const auto database = test::freshDatabase();
+		test::addBook(*database, "A Book", {"An Author"});
+		const auto settings = freshSettings();
+		MainWindow window(*database, *settings);
+		window.show();
+		QVERIFY(QTest::qWaitForWindowExposed(&window));
+
+		QTableView* table = window.bookView();
+		QHeaderView* header = table->horizontalHeader();
+		auto visibleWidth = [&] {
+			int total = 0;
+			for (int column = 0; column < header->count(); ++column)
+				if (!header->isSectionHidden(column))
+					total += header->sectionSize(column);
+			return total;
+		};
+		QTRY_COMPARE(visibleWidth(), table->viewport()->width());
+		// Title gets more room than Authors by default.
+		QVERIFY(header->sectionSize(int(BookColumn::Title)) > header->sectionSize(int(BookColumn::Authors)));
+
+		// Turning on more columns shares the same width among them.
+		window.columnActions().at(int(BookColumn::Isbn))->setChecked(true);
+		window.columnActions().at(int(BookColumn::PageCount))->setChecked(true);
+		QCOMPARE(visibleWidth(), table->viewport()->width());
+		for (int column = 0; column < header->count(); ++column)
+			if (!header->isSectionHidden(column))
+				QVERIFY(header->sectionSize(column) >= window.columnFitter()->minimumWidth(column));
 	}
 
 	void mainWindowListsBooksAndHidesPrivate()
