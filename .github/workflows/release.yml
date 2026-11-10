@@ -130,8 +130,14 @@ jobs:
         run: |
           # "cmake --install" copies the app and, through Qt's deployment
           # script (windeployqt), every Qt DLL and plugin it needs.
-          cmake --install build/windows-release --prefix staging/MyBookTally
-          Compress-Archive -Path staging/MyBookTally -DestinationPath "MyBookTally-$env:VERSION-windows-x64.zip" -Force
+          #
+          # The prefix must be an absolute path: Qt's deployment script
+          # refuses a relative one ("Given qt.conf path is not an absolute
+          # path") because it runs from a different working directory.
+          $staging = Join-Path $env:GITHUB_WORKSPACE "staging/MyBookTally"
+          cmake --install build/windows-release --prefix "$staging"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Compress-Archive -Path "$staging" -DestinationPath "MyBookTally-$env:VERSION-windows-x64.zip" -Force
 
       - uses: actions/upload-artifact@v4
         with:

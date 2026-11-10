@@ -210,6 +210,8 @@ These steps use Microsoft Visual C++ (MSVC), the same compiler the GitHub releas
 
    For the debug version, use `build\windows-debug`. Its copy goes to `dist\windows-debug\bin`.
 
+   To put the copy somewhere else, add `--prefix` with a **full** path, such as `--prefix C:\Apps\MyBookTally`. A relative path such as `--prefix out` fails on Windows with "Given qt.conf path is not an absolute path", because Qt's deployment step requires an absolute one.
+
    The `dist\windows-release\bin` folder is self-contained. Zip it up and it runs on any 64-bit Windows 10 or 11 PC, which is how the GitHub release is made. On some PCs, Windows may also ask for the Microsoft Visual C++ Redistributable, which you can get from Microsoft.
 
 If you build from inside **Qt Creator** or **Visual Studio** (see [Using an IDE](#using-an-ide)), the IDE adds Qt to the path when it runs the app, so you can run it without the install step.
