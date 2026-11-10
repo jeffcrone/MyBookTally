@@ -5,3 +5,8 @@ CLAUDE.local.md
 .mcp.json
 .worktreeinclude
 .claude-plugin/
+
+# Build output. Each CMake preset builds into build/<preset> and installs
+# into dist/<preset>; see README.md.
+build/
+dist/

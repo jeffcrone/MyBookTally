@@ -1,0 +1,172 @@
+# Release workflow.
+#
+# Runs on every push to main (and on demand from the Actions tab), but only
+# releases when the version in CMakeLists.txt has not been released yet. So a
+# push that leaves the version alone finishes having done nothing, and bumping
+# the version in project(... VERSION x.y.z) is what cuts a release.
+#
+# When it does release, it:
+#   1. runs the full test suite on Linux and on Windows; a failure stops here,
+#   2. builds the Windows release and packages it as a zip,
+#   3. creates the tag vX.Y.Z and the GitHub release, with the zip attached.
+#
+# It never runs because a tag was pushed: it creates the tag itself. (A tag
+# pushed with GITHUB_TOKEN does not start other workflows either, so this
+# cannot trigger itself.)
+
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Two quick pushes must not race each other into creating the same release.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # The Qt used for the Windows build: the current long-term-support release.
+  QT_VERSION: "6.8.3"
+
+jobs:
+  version:
+    name: Check version
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.read.outputs.version }}
+      tag: ${{ steps.read.outputs.tag }}
+      release_needed: ${{ steps.check.outputs.release_needed }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version from CMakeLists.txt
+        id: read
+        run: |
+          # The project() call has a line of its own reading "VERSION x.y.z".
+          # (cmake_minimum_required's VERSION is inside parentheses on its
+          # line, so it does not match.)
+          version=$(sed -n -E 's/^[[:space:]]+VERSION[[:space:]]+([0-9]+\.[0-9]+\.[0-9]+)[[:space:]]*$/\1/p' CMakeLists.txt | head -n 1)
+          if [ -z "$version" ]; then
+            echo "::error file=CMakeLists.txt::Could not find 'VERSION x.y.z' in the project() call."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          echo "Version in CMakeLists.txt: $version"
+
+      - name: Check whether this version is already released
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.read.outputs.tag }}
+        run: |
+          # Keyed on the release rather than only the tag, so if an earlier
+          # run created the tag but failed before finishing the release,
+          # re-running finishes the job instead of skipping it.
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "release_needed=false" >> "$GITHUB_OUTPUT"
+            echo "$TAG is already released. Nothing to do; bump the version in CMakeLists.txt to release." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "release_needed=true" >> "$GITHUB_OUTPUT"
+            echo "$TAG has not been released yet. Building and releasing it." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  test-linux:
+    name: Test (Linux)
+    needs: version
+    if: needs.version.outputs.release_needed == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt and build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build g++ qt6-base-dev libqt6sql6-sqlite libgl-dev
+
+      - name: Build and run the tests (release configuration)
+        run: cmake --workflow --preset linux-release
+
+  build-windows:
+    name: Build and test (Windows)
+    needs: version
+    if: needs.version.outputs.release_needed == 'true'
+    runs-on: windows-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          host: windows
+          target: desktop
+          arch: win64_msvc2022_64
+          cache: true
+
+      - name: Set up the Visual C++ environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Configure
+        run: cmake --preset windows-release -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
+
+      - name: Build
+        run: cmake --build --preset windows-release
+
+      - name: Run the tests
+        run: ctest --preset windows-release
+
+      - name: Package
+        run: |
+          # "cmake --install" copies the app and, through Qt's deployment
+          # script (windeployqt), every Qt DLL and plugin it needs.
+          cmake --install build/windows-release --prefix staging/MyBookTally
+          Compress-Archive -Path staging/MyBookTally -DestinationPath "MyBookTally-$env:VERSION-windows-x64.zip" -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: MyBookTally-*-windows-x64.zip
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub release
+    needs: [version, test-linux, build-windows]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-release
+
+      - name: Create the tag and release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.version.outputs.tag }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          zip="MyBookTally-$VERSION-windows-x64.zip"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            # Safe to re-run: replace the asset rather than failing on it.
+            gh release upload "$TAG" "$zip" --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            # --target creates the tag on the commit that was tested and
+            # built (or uses the tag if a failed earlier run left one).
+            gh release create "$TAG" "$zip" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "MyBookTally $VERSION" \
+              --generate-notes
+          fi
+          echo "Released $TAG with $zip." >> "$GITHUB_STEP_SUMMARY"
