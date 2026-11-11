@@ -10,7 +10,7 @@
 cmake_minimum_required(VERSION 3.25)
 
 project(MyBookTally
-	VERSION 0.0.2
+	VERSION 0.1.0
 	DESCRIPTION "Keep track of the books in your personal collection"
 	HOMEPAGE_URL "https://github.com/jeffcrone/MyBookTally"
 	LANGUAGES CXX
