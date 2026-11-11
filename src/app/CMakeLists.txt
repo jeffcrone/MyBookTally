@@ -15,6 +15,10 @@ add_library(mybooktally_gui STATIC
 	MainWindow.h
 	ManageDialog.cpp
 	ManageDialog.h
+	OpenLibraryLookupDialog.cpp
+	OpenLibraryLookupDialog.h
+	SettingsDialog.cpp
+	SettingsDialog.h
 	SmallDialogs.cpp
 	SmallDialogs.h
 	UiUtil.cpp

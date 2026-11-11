@@ -6,9 +6,12 @@
 
 namespace mbt::CoverImage {
 
-QByteArray loadForStorage(const QString& filePath, QString* errorMessage)
+namespace {
+
+// Shared by the file and in-memory versions, so both store covers the same
+// way.
+QByteArray readForStorage(QImageReader& reader, QString* errorMessage)
 {
-	QImageReader reader(filePath);
 	// Phone cameras store sideways pixels plus an "orientation" tag; without
 	// this the cover would show up rotated.
 	reader.setAutoTransform(true);
@@ -32,6 +35,23 @@ QByteArray loadForStorage(const QString& filePath, QString* errorMessage)
 	else
 		image.save(&buffer, "JPEG", 90);
 	return bytes;
+}
+
+} // namespace
+
+QByteArray loadForStorage(const QString& filePath, QString* errorMessage)
+{
+	QImageReader reader(filePath);
+	return readForStorage(reader, errorMessage);
+}
+
+QByteArray prepareForStorage(const QByteArray& imageData, QString* errorMessage)
+{
+	QBuffer buffer;
+	buffer.setData(imageData);
+	buffer.open(QIODevice::ReadOnly);
+	QImageReader reader(&buffer);
+	return readForStorage(reader, errorMessage);
 }
 
 QPixmap toPixmap(const QByteArray& bytes, const QSize& box)

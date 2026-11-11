@@ -4,9 +4,12 @@
 #include "CoverImage.h"
 #include "Database.h"
 #include "DatabaseError.h"
+#include "ErrorLog.h"
 #include "Isbn.h"
 #include "LinkListEditor.h"
 #include "LookupRepository.h"
+#include "OpenLibrary.h"
+#include "OpenLibraryLookupDialog.h"
 #include "SqlUtil.h"
 #include "UiUtil.h"
 
@@ -68,9 +71,11 @@ QString formatPosition(const std::optional<double>& position)
 
 } // namespace
 
-BookEditorDialog::BookEditorDialog(const Database& database, const Book& book, QWidget* parent)
+BookEditorDialog::BookEditorDialog(const Database& database, const Book& book, QWidget* parent,
+	OpenLibraryClient* openLibrary)
 	: QDialog(parent)
 	, m_database(database)
+	, m_openLibrary(openLibrary)
 	, m_book(book)
 	, m_cover(book.coverImage)
 {
@@ -85,9 +90,29 @@ BookEditorDialog::BookEditorDialog(const Database& database, const Book& book, Q
 	connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
 	connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
 
+	// Only when adding: the lookup replaces most of the form, which is what
+	// is wanted for a new book but would quietly overwrite a book the user
+	// has already cataloged and maybe corrected by hand.
+	//
+	// It sits on its own at the left of the button row rather than inside
+	// the button box, where some styles would place it between OK and
+	// Cancel and make it easy to press by mistake.
+	auto* buttonRow = new QHBoxLayout;
+	if (book.id.isEmpty() && m_openLibrary) {
+		m_lookup = new QPushButton(tr("Look &Up on Open Library..."), this);
+		m_lookup->setToolTip(tr("Type what you know (the title, an author, or the ISBN), then press "
+			"this to choose the book from Open Library and fill in the rest."));
+		// Enter in a field must still mean OK, not start a lookup.
+		m_lookup->setAutoDefault(false);
+		connect(m_lookup, &QPushButton::clicked, this, &BookEditorDialog::lookUpOnOpenLibrary);
+		buttonRow->addWidget(m_lookup);
+	}
+	buttonRow->addStretch();
+	buttonRow->addWidget(buttons);
+
 	auto* layout = new QVBoxLayout(this);
 	layout->addWidget(tabs);
-	layout->addWidget(buttons);
+	layout->addLayout(buttonRow);
 
 	loadBook();
 	resize(620, 560);
@@ -364,6 +389,114 @@ void BookEditorDialog::chooseCover()
 	}
 	m_cover = bytes;
 	showCover();
+}
+
+OpenLibraryQuery BookEditorDialog::lookupQuery() const
+{
+	OpenLibraryQuery query;
+	query.title = m_title->text().trimmed();
+	// The first author is the one most likely to be credited the same way
+	// on Open Library; the list is used if anything was added to it,
+	// otherwise whatever is typed in the picker.
+	const QList<LinkChoice> authors = m_authors->selected();
+	query.author = authors.isEmpty() ? m_authors->picker()->currentText().trimmed()
+									 : authors.first().name;
+	query.isbn = m_isbn->text().trimmed();
+	return query;
+}
+
+void BookEditorDialog::lookUpOnOpenLibrary()
+{
+	if (!m_openLibrary)
+		return;
+	const QString title = tr("Look Up on Open Library");
+	const OpenLibraryQuery query = lookupQuery();
+	if (query.isEmpty()) {
+		QMessageBox::information(this, title,
+			tr("Type what you know about the book first (its title, an author, or its ISBN), "
+				"then press Look Up on Open Library again."));
+		return;
+	}
+	// A mistyped ISBN on its own would search for nothing at all; with a
+	// title or author as well, the search simply uses those instead.
+	if (!query.isbn.isEmpty() && !Isbn::isWellFormed(query.isbn)
+		&& query.title.isEmpty() && query.author.isEmpty()) {
+		QMessageBox::warning(this, title,
+			tr("An ISBN has 10 or 13 digits (an ISBN-10 may end in X). Please check it, "
+				"or type the title or an author instead."));
+		return;
+	}
+
+	OpenLibraryLookupDialog dialog(*m_openLibrary, query, this);
+	if (dialog.exec() == QDialog::Accepted)
+		applyLookup(dialog.chosenBook());
+}
+
+void BookEditorDialog::applyLookup(const OpenLibraryBook& found)
+{
+	if (!found.title.isEmpty())
+		m_title->setText(found.title);
+
+	// Open Library's author list replaces the typed one: it is in credit
+	// order and spelled consistently. Names that match an author already in
+	// the library link to that author rather than creating a duplicate.
+	if (!found.authors.isEmpty()) {
+		m_authors->setSelected({});
+		for (const QString& name : found.authors)
+			m_authors->addChoice(m_authors->choiceFor(name));
+	}
+
+	if (!found.releaseDate.isEmpty())
+		m_releaseDate->setText(found.releaseDate);
+	if (!found.isbn.isEmpty())
+		m_isbn->setText(found.isbn);
+	if (found.pageCount && *found.pageCount > 0 && *found.pageCount <= m_pages->maximum())
+		m_pages->setValue(*found.pageCount);
+
+	// The format only fills in the type when it names one the user has;
+	// a new book type is not invented from Open Library's free text.
+	if (!found.physicalFormat.isEmpty()) {
+		const QString typeName = OpenLibrary::bookTypeNameFor(found.physicalFormat);
+		for (int i = 0; i < m_bookType->count(); ++i) {
+			if (!m_bookType->itemData(i).toString().isEmpty()
+				&& m_bookType->itemText(i).compare(typeName, Qt::CaseInsensitive) == 0) {
+				m_bookType->setCurrentIndex(i);
+				break;
+			}
+		}
+	}
+
+	if (!found.description.isEmpty())
+		m_description->setPlainText(found.description);
+
+	// Subjects become genres only when the user already has a genre of
+	// that name. Open Library lists dozens per book, most of them people
+	// and places in the story, which would swamp the genre list.
+	for (const QString& subject : found.subjects) {
+		for (const LinkChoice& genre : m_genres->choices()) {
+			if (genre.name.compare(subject, Qt::CaseInsensitive) == 0) {
+				m_genres->addChoice(genre);
+				break;
+			}
+		}
+	}
+
+	if (!found.coverImage.isEmpty()) {
+		QString error;
+		const QByteArray cover = CoverImage::prepareForStorage(found.coverImage, &error);
+		if (cover.isEmpty()) {
+			const QString message = tr("The cover image from Open Library could not be read: %1").arg(error);
+			ErrorLog::instance().record(QStringLiteral("Reading the cover image of \"%1\" downloaded from "
+				"Open Library").arg(found.title),
+				QStringLiteral("%1\nCover id: %2\nDownloaded bytes: %3")
+					.arg(message).arg(found.coverId).arg(found.coverImage.size()));
+			QMessageBox::warning(this, tr("Look Up on Open Library"),
+				message + QStringLiteral("\n\n") + tr("The rest of the details have been filled in."));
+		} else {
+			m_cover = cover;
+			showCover();
+		}
+	}
 }
 
 QString BookEditorDialog::validate()

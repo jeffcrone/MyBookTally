@@ -107,17 +107,29 @@ bool LinkListEditor::addCurrentText()
 	const QString name = m_picker->currentText().trimmed();
 	if (name.isEmpty())
 		return false;
+	if (!addChoice(choiceFor(name)))
+		return false;
+	m_picker->setCurrentIndex(-1);
+	m_picker->clearEditText();
+	return true;
+}
 
+LinkChoice LinkListEditor::choiceFor(const QString& name) const
+{
 	// Typed text that matches an existing record (ignoring case) means that
 	// record, not a new one with the same name.
-	LinkChoice choice{QString(), name};
+	const QString trimmed = name.trimmed();
 	for (const LinkChoice& existing : m_choices) {
-		if (existing.name.compare(name, Qt::CaseInsensitive) == 0) {
-			choice = existing;
-			break;
-		}
+		if (existing.name.compare(trimmed, Qt::CaseInsensitive) == 0)
+			return existing;
 	}
+	return LinkChoice{QString(), trimmed};
+}
 
+bool LinkListEditor::addChoice(const LinkChoice& choice)
+{
+	if (choice.name.trimmed().isEmpty())
+		return false;
 	for (const LinkChoice& already : selected()) {
 		const bool sameRecord = !choice.id.isEmpty() && already.id == choice.id;
 		const bool sameNewName = choice.id.isEmpty() && already.id.isEmpty()
@@ -125,10 +137,7 @@ bool LinkListEditor::addCurrentText()
 		if (sameRecord || sameNewName)
 			return false;
 	}
-
 	appendChoice(choice);
-	m_picker->setCurrentIndex(-1);
-	m_picker->clearEditText();
 	updateButtons();
 	return true;
 }

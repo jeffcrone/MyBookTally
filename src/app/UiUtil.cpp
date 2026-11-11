@@ -1,6 +1,7 @@
 #include "UiUtil.h"
 
 #include "DatabaseError.h"
+#include "ErrorLog.h"
 #include "LookupRepository.h"
 
 #include <QComboBox>
@@ -16,6 +17,10 @@ bool runReportingErrors(QWidget* parent, const QString& title, const std::functi
 		action();
 		return true;
 	} catch (const DatabaseError& error) {
+		// The full message, SQL included, goes to the console or log file
+		// if the user has turned them on in Settings.
+		ErrorLog::instance().record(QStringLiteral("%1 (saving to or reading from the library database)")
+			.arg(title), error.message());
 		// The first line is the explanation; anything after it is the SQL,
 		// useful when reporting a bug but noise in the main message.
 		QMessageBox box(QMessageBox::Warning, title,

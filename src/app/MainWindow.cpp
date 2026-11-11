@@ -11,6 +11,8 @@
 #include "ListRepository.h"
 #include "LookupRepository.h"
 #include "ManageDialog.h"
+#include "OpenLibraryClient.h"
+#include "SettingsDialog.h"
 #include "SmallDialogs.h"
 #include "SqlUtil.h"
 #include "UiUtil.h"
@@ -138,6 +140,7 @@ MainWindow::MainWindow(Database& database, QSettings& settings, QWidget* parent)
 {
 	setWindowTitle(QStringLiteral("MyBookTally"));
 	setWindowIcon(appIcon());
+	m_openLibrary = new OpenLibraryClient(this);
 
 	buildActions();
 	buildLayout();
@@ -186,6 +189,12 @@ void MainWindow::buildActions()
 
 	m_exportSelected = new QAction(tr("Export &Selected Books..."), this);
 	connect(m_exportSelected, &QAction::triggered, this, [this] { exportBooks(true); });
+
+	m_settingsAction = new QAction(tr("&Settings..."), this);
+	m_settingsAction->setShortcut(QKeySequence::Preferences);
+	// On macOS this moves it to the application menu, where users look.
+	m_settingsAction->setMenuRole(QAction::PreferencesRole);
+	connect(m_settingsAction, &QAction::triggered, this, &MainWindow::showSettings);
 
 	m_showPrivate = new QAction(tr("Show &Private Books"), this);
 	m_showPrivate->setCheckable(true);
@@ -306,6 +315,8 @@ void MainWindow::buildMenus()
 	file->addAction(m_import);
 	file->addAction(m_exportAll);
 	file->addAction(m_exportSelected);
+	file->addSeparator();
+	file->addAction(m_settingsAction);
 	file->addSeparator();
 	QAction* quit = file->addAction(tr("&Quit"), this, &QWidget::close);
 	quit->setShortcut(QKeySequence::Quit);
@@ -545,7 +556,7 @@ QList<QString> MainWindow::selectedBookIds() const
 
 void MainWindow::addBook()
 {
-	BookEditorDialog editor(m_database, Book(), this);
+	BookEditorDialog editor(m_database, Book(), this, m_openLibrary);
 	if (editor.exec() != QDialog::Accepted)
 		return;
 	const QString newId = editor.savedBook().id;
@@ -840,6 +851,12 @@ void MainWindow::exportBooks(bool selectedOnly)
 	}
 	statusBar()->showMessage(tr("Exported %n book(s) to %1", nullptr, int(ids.size()))
 		.arg(QDir::toNativeSeparators(path)), 8000);
+}
+
+void MainWindow::showSettings()
+{
+	SettingsDialog dialog(m_settings, this);
+	dialog.exec();
 }
 
 void MainWindow::showAbout()

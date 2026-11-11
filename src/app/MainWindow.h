@@ -20,6 +20,7 @@ namespace mbt {
 class BookTableModel;
 class ColumnFitter;
 class Database;
+class OpenLibraryClient;
 
 // The main window: the user's lists on the left ("Library" for every book,
 // then each list they have made), and the books in the selected one on the
@@ -54,6 +55,10 @@ public:
 	// The View > Columns action for each column, in column order.
 	const QList<QAction*>& columnActions() const { return m_columnActions; }
 	ColumnFitter* columnFitter() const { return m_columnFitter; }
+	// The one Open Library client, shared by every Add Book dialog so its
+	// once-a-second limit holds across all of them.
+	OpenLibraryClient* openLibraryClient() const { return m_openLibrary; }
+	QAction* settingsAction() const { return m_settingsAction; }
 
 	// The size the window opens at on first run, for a screen whose usable
 	// area is availableScreen: 1280 x 780, or 90% of the screen if smaller.
@@ -90,6 +95,7 @@ private:
 	void importBooks();
 	void exportBooks(bool selectedOnly);
 	void showAbout();
+	void showSettings();
 
 	Database& m_database;
 	QSettings& m_settings;
@@ -102,6 +108,7 @@ private:
 	QLabel* m_status = nullptr;
 	QMenu* m_addToListMenu = nullptr;
 	ColumnFitter* m_columnFitter = nullptr;
+	OpenLibraryClient* m_openLibrary = nullptr;
 
 	QAction* m_addBook = nullptr;
 	QAction* m_editBook = nullptr;
@@ -115,6 +122,7 @@ private:
 	QAction* m_exportAll = nullptr;
 	QAction* m_exportSelected = nullptr;
 	QAction* m_showPrivate = nullptr;
+	QAction* m_settingsAction = nullptr;
 	QList<QAction*> m_columnActions;
 };
 

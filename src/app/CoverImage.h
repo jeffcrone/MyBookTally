@@ -20,6 +20,10 @@ constexpr int MaxHeight = 900;
 // Returns an empty array and sets errorMessage if the file is not an image.
 QByteArray loadForStorage(const QString& filePath, QString* errorMessage);
 
+// The same, for an image already in memory, such as a cover downloaded
+// from Open Library.
+QByteArray prepareForStorage(const QByteArray& imageData, QString* errorMessage);
+
 // The stored bytes as a pixmap scaled to fit within box, or a null pixmap
 // if there is no (readable) image.
 QPixmap toPixmap(const QByteArray& bytes, const QSize& box);

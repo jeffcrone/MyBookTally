@@ -14,7 +14,8 @@ class Database;
 enum class LookupKind;
 
 // Runs action, and if it throws DatabaseError shows the message in a dialog
-// over parent. Returns true if action finished without throwing.
+// over parent and records the full error in ErrorLog, with title as what
+// the app was doing. Returns true if action finished without throwing.
 //
 // Every menu command that touches the database goes through this, so a
 // failed query is reported to the user instead of ending the program with

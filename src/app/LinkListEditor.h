@@ -45,6 +45,15 @@ public:
 	// Returns false if the text was empty or already in the list.
 	bool addCurrentText();
 
+	// The existing record called name (ignoring case), or a new one with
+	// that name and no id if there is none.
+	LinkChoice choiceFor(const QString& name) const;
+	// Adds choice to the list unless the same record, or a new record with
+	// the same name, is already there. Returns whether it was added.
+	bool addChoice(const LinkChoice& choice);
+	// The records offered in the drop-down.
+	const QList<LinkChoice>& choices() const { return m_choices; }
+
 	QComboBox* picker() const { return m_picker; }
 	QListWidget* list() const { return m_list; }
 

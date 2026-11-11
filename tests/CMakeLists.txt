@@ -9,7 +9,7 @@
 #   name   - the test's name, and the source file is ${name}.cpp
 #   ARGN   - libraries to link besides Qt Test
 function(mybooktally_add_test name)
-	qt_add_executable(${name} ${name}.cpp TestSupport.h)
+	qt_add_executable(${name} ${name}.cpp TestSupport.h FakeHttpServer.h OpenLibrarySamples.h)
 	target_link_libraries(${name} PRIVATE Qt6::Test ${ARGN})
 	target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 	add_test(NAME ${name} COMMAND ${name})
@@ -49,8 +49,14 @@ mybooktally_add_test(tst_review_repository mybooktally_core)
 mybooktally_add_test(tst_list_repository mybooktally_core)
 mybooktally_add_test(tst_json_exchange mybooktally_core)
 mybooktally_add_test(tst_book_table_model mybooktally_core)
+mybooktally_add_test(tst_error_log mybooktally_core)
+mybooktally_add_test(tst_open_library mybooktally_core)
+# Talks to a fake server on 127.0.0.1 (FakeHttpServer.h), never the real
+# Open Library, so it needs no internet connection.
+mybooktally_add_test(tst_open_library_client mybooktally_core)
 mybooktally_add_test(tst_gui mybooktally_gui)
 mybooktally_add_test(tst_column_fitter mybooktally_gui)
+mybooktally_add_test(tst_open_library_gui mybooktally_gui)
 
 # Linux only: checks that installing produces a menu entry and icons, which
 # are the only way a Linux app shows its icon. Not a Qt Test program, so it

@@ -22,7 +22,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Qt 6.4 is the oldest release this is built and tested against (it is what
 # Ubuntu 24.04 ships). The Windows release build uses a newer Qt 6 LTS.
-find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Widgets Sql Test)
+# Network is for looking books up on Open Library.
+find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Widgets Sql Network Test)
 qt_standard_project_setup()
 
 option(MYBOOKTALLY_BUILD_TESTS "Build the automated tests" ON)

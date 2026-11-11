@@ -8,6 +8,8 @@ MyBookTally is a simple, easy-to-use desktop application that helps you keep tra
 ## Contents
 
 - [Features](#features)
+- [Looking books up on Open Library](#looking-books-up-on-open-library)
+- [Settings and error logging](#settings-and-error-logging)
 - [Where your data is kept](#where-your-data-is-kept)
 - [Building](#building)
   - [Building on Linux](#building-on-linux)
@@ -44,6 +46,8 @@ MyBookTally is a simple, easy-to-use desktop application that helps you keep tra
   - where it is
   - a description
   - a cover image
+- **Look books up on Open Library.** In **Add Book**, type whatever you know (the title, an author, or the ISBN) and press **Look Up on Open Library...**. Pick your book from the list of matches, which shows each one's cover, title, authors, ISBN, and publication date, and the form is filled in for you. See [Looking books up on Open Library](#looking-books-up-on-open-library).
+- **Error logging.** When something goes wrong you get a message explaining it. In **File › Settings** you choose whether the full error is also printed to the console (on by default) and saved to a log file (off by default). See [Settings and error logging](#settings-and-error-logging).
 - **Private books.** Tick "Private" to hide a book from the main library list. **View › Show Private Books** shows them again.
 - **Ratings and reviews.** Rate a book on any scale ("4/5", "8/10") and write reviews. Each can be your own or someone else's.
 - **Lists.** Make your own lists ("Favorites", "To buy", "Book club"), add books to them and remove books from them, and view each list on its own. Removing a book from a list never deletes the book.
@@ -52,12 +56,84 @@ MyBookTally is a simple, easy-to-use desktop application that helps you keep tra
 
 Planned for later: importing and exporting your book list to and from the MyBookTally website, once it exists, for your account there.
 
+## Looking books up on Open Library
+
+[Open Library](https://openlibrary.org) is a free, open catalog of books run by the Internet Archive. MyBookTally can fill in a new book's details from it.
+
+1. Choose **Book › Add Book...**.
+2. Type what you know about the book: its title, an author, its ISBN, or any mix of them. If you type an ISBN, the search uses only the ISBN, since it identifies the exact edition. Otherwise the title and the first author are searched as separate fields.
+3. Press **Look Up on Open Library...** (Alt+U).
+4. A list of matching books appears, up to 20 of them. For each one you see the cover, title, authors, ISBN, and publication date of the edition that best matches your search. Titles appear straight away, and covers fill in about one per second (see below).
+5. Select your book and press **Use This Book** (or double-click it). If it is not in the list, press **Cancel**: the form is left exactly as it was.
+6. MyBookTally fetches that book's full details and fills in the form. Check it, add anything else you like, and press **OK** to add the book.
+
+**What gets filled in:**
+
+| Field | From Open Library |
+| --- | --- |
+| Title | The edition's title, with its subtitle after a colon ("The Hobbit: or There and Back Again") |
+| Authors | The authors, in credit order. A name that matches an author already in your library (ignoring case) links to that author instead of creating a second one. |
+| Released | The edition's publication date, as `YYYY`, `YYYY-MM`, or `YYYY-MM-DD`, depending on how much of it Open Library has. If the edition has no date, the date the work was first published is used. |
+| ISBN | The ISBN you searched for if you typed one, otherwise the edition's ISBN-13, otherwise its ISBN-10 |
+| Pages | The edition's page count |
+| Type | The edition's format, when it means one of your book types: "Hardback" fills in Hardcover, "Kindle Edition" fills in E-book, and so on. A format that matches none of your types is ignored; no new type is created. |
+| Description | The edition's description, or the work's if the edition has none |
+| Genres | Open Library's subjects that match a genre already in your library. Its subject lists also name every character and place in a book, so no new genres are created from them. |
+| Cover | The large cover image, scaled down for storage like a cover you choose yourself |
+
+A field that Open Library has nothing for keeps whatever you typed. Ownership, reading status, location, series, and the Private box are about your own copy, so the lookup never changes them. The lookup is only offered when adding a book, never when editing one, so a book you have already cataloged (and maybe corrected by hand) cannot be overwritten by accident.
+
+**Errors.** If the search fails (no internet connection, Open Library is down or busy, an unexpected reply), a message tells you what went wrong, with the full error under **Show Details...**, and you are back at the form. If the search works but some of the chosen book's details cannot be fetched, the message lists what is missing, and the form is filled in with everything that did arrive. A cover that cannot be loaded in the list of matches is marked "Not available" instead of interrupting you with a message. All of these are also logged as set in **File › Settings** (see [Settings and error logging](#settings-and-error-logging)).
+
+### Following Open Library's rules
+
+Open Library asks programs that use its API to follow its [usage guidelines](https://openlibrary.org/developers/api). MyBookTally does so as follows:
+
+- **At most one request per second.** That is Open Library's limit for programs that do not send contact details. All requests to Open Library and its cover server go through one shared queue that starts them at least one second apart, however many lookups are open. This is why covers in the list of matches appear one by one. Once you pick a book, any covers still waiting are dropped so that book's details are fetched next. A lookup of one book takes a search, plus about three more requests (edition, work, cover) after you pick it.
+- **Caching.** Every successful answer is kept in memory until MyBookTally closes, so looking at the same results again sends nothing.
+- **Only what a person asked for.** Requests are made only when you press the button, and never in bulk. Searches use `search.json`, as Open Library asks, rather than many single-book requests.
+
+**What is sent, and what is not.** Requests go to `openlibrary.org` and `covers.openlibrary.org` (covers are then served from `archive.org`) over HTTPS. They contain only the search terms you typed and the Open Library ids of the book you picked. The `User-Agent` header is just `MyBookTally/<version>`.
+
+- **No contact details.** Open Library offers a higher limit (three requests per second) to programs that put a contact email address or phone number in the `User-Agent`. MyBookTally deliberately does not, so it stays at one per second.
+- **Nothing that identifies you.** No email address, name, account, or library contents is sent. No cookies are stored or sent. The `Accept-Language` header is a fixed `en` rather than your computer's language settings.
+- **Your IP address.** Like any internet request, Open Library sees your computer's IP address. MyBookTally cannot avoid that.
+
+## Settings and error logging
+
+**File › Settings...** holds MyBookTally's preferences. For now, these are where the full text of an error is written.
+
+When something goes wrong, such as Open Library not being reachable or the database refusing a change, a message explains the problem in a sentence or two. The full error is longer: for a network error, the web address, the HTTP status, and the start of the server's reply; for a database error, the SQL. That is what you need to work out why it happened. Each entry also says what MyBookTally was doing at the time.
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| Print the full error to the console (standard error) | On | Writes each error to standard error. You see it only if you started MyBookTally from a terminal (Linux) or from Command Prompt or PowerShell (Windows). |
+| Save the full error to a log file named MyBookTally.log | Off | Adds each error to the end of `MyBookTally.log`, in the same folder as your library (see the table below). The setting shows the file name, folder, and full path. Nothing is ever removed from the file; delete it whenever you like. |
+
+A log entry looks like this:
+
+```
+[2026-11-11T21:05:17.039Z] MyBookTally <version> error
+While: Searching Open Library for title "The Hobbit", author "Tolkien"
+Open Library had a problem answering (HTTP 503). It may be busy or down for maintenance; please try again later.
+Request: GET https://openlibrary.org/search.json?title=The%20Hobbit&author=Tolkien&fields=...&limit=20
+HTTP status: 503 Service Unavailable
+Network error: ... (Qt code 403)
+User-Agent sent: MyBookTally/<version>
+Response body:
+...
+```
+
+Times are in UTC. The settings take effect as soon as you press OK, and are remembered.
+
 ## Where your data is kept
 
 | | Library database | Window and column settings |
 | --- | --- | --- |
 | Linux | `~/.local/share/MyBookTally/MyBookTally.sqlite` | `~/.config/MyBookTally/MyBookTally.conf` |
 | Windows | `%APPDATA%\MyBookTally\MyBookTally.sqlite` | Registry: `HKEY_CURRENT_USER\Software\MyBookTally\MyBookTally` |
+
+The error log, if you turn it on in **File › Settings**, is `MyBookTally.log` in the same folder as the library database.
 
 **Help › About MyBookTally** shows the exact path on your computer. To back up your library, copy the `.sqlite` file while the app is closed, or use **File › Export**.
 
@@ -230,7 +306,7 @@ If you build from inside **Qt Creator** or **Visual Studio** (see [Using an IDE]
 
 ## Running the automated tests
 
-The tests are written with Qt Test and run by CTest. There are 10 test programs, which together check every database query, the import and export code, ISBN checking, the table model, column fitting, and the main window and dialogs. On Linux there is also an 11th test, which checks what installing produces:
+The tests are written with Qt Test and run by CTest. There are 14 test programs, which together check every database query, the import and export code, ISBN checking, the table model, column fitting, the Open Library lookup, error logging, and the main window and dialogs. On Linux there is also a 15th test, which checks what installing produces:
 
 | Test | What it covers |
 | --- | --- |
@@ -243,10 +319,14 @@ The tests are written with Qt Test and run by CTest. There are 10 test programs,
 | `tst_json_exchange` | Export with and without IDs, import into an empty library, re-importing without duplicates, matching books by ISBN or by title and authors, bad files |
 | `tst_book_table_model` | What each column shows, and that numbers sort as numbers |
 | `tst_gui` | The main window (first-run size, columns, search, lists, private books), the book editor, the details dialog, and the manage dialog, driven as a user would |
+| `tst_error_log` | Error logging: console on and file off by default, the log file's name and folder, entry format, appending, creating a missing folder, and a file that cannot be written |
+| `tst_open_library` | The Open Library URLs (search fields, ISBN-only searches, special characters, refusing odd record keys, cover sizes), reading search results, edition and work records, turning Open Library's dates into the app's format, and matching formats to book types |
+| `tst_open_library_client` | The network client: at least one second between requests, no cookies or personal details sent, the exact `User-Agent`, HTTP errors and timeouts described and logged, caching, and canceling |
+| `tst_open_library_gui` | The lookup as the user sees it: the button on Add Book only, the list of matches with covers, choosing a book, filling in the form, errors, canceling; and the Settings dialog |
 | `tst_column_fitter` | Sharing the table's width among its columns: proportions, minimum widths, resizing the window, showing and hiding columns, and dragging a column edge |
 | `check_linux_install` | Linux only. Installs the build into a scratch folder and checks the menu entry (full program path, icon name, and `desktop-file-validate` if that tool is installed) and the icons at every size. Needs a completed build. |
 
-The tests never touch your real library: each one uses its own throwaway in-memory database and a throwaway settings file. The window tests use Qt's "offscreen" display, so no windows appear and no screen is needed.
+The tests never touch your real library: each one uses its own throwaway in-memory database and a throwaway settings file. The Open Library tests talk to a small fake server on your own computer (`127.0.0.1`), never to the real Open Library, so they need no internet connection. The window tests use Qt's "offscreen" display, so no windows appear and no screen is needed.
 
 **On Linux** (from the project folder):
 
@@ -1011,15 +1091,20 @@ Keys with no value are left out. Only `format`, `formatVersion`, `books`, and ea
 CMakeLists.txt           Top-level build script; holds the version number
 CMakePresets.json        The build presets (linux-debug, windows-release, ...)
 MyBookTally_Icons/       The app icon: SVG master, PNGs, and Windows .ico
-src/core/                Everything that touches the database (no windows)
+src/core/                Everything that touches the database or the network (no windows)
   Database, Schema         Opening the file, creating and upgrading tables
   *Repository              The SQL queries, one class per area
   JsonExchange             Import and export
   BookTableModel           The data behind the main book table
   Isbn                     ISBN clean-up and checking
+  OpenLibrary              Open Library URLs, and reading its replies
+  OpenLibraryClient        Requests to Open Library: rate limit, cache, privacy
+  ErrorLog                 Writing full errors to the console and the log file
 src/app/                 The windows and dialogs, and main.cpp
+  OpenLibraryLookupDialog  The list of matches to pick from
+  SettingsDialog           File > Settings
 packaging/linux/         Linux desktop menu entry template (filled in at install time)
-tests/                   The automated tests (Qt Test)
+tests/                   The automated tests (Qt Test), and a fake web server for them
 .github/workflows/       GitHub Actions: tests.yml and release.yml
 ```
 
